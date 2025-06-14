@@ -1,0 +1,151 @@
+name: s1panel
+adopt-info: s1panel
+license: GPL-3.0-or-later
+base: core24
+summary: Manage the front-facing LCD display on the S1 Mini PC.
+description: |
+  - Real-time system monitoring (e.g., CPU usage, temperature, network stats)
+  - Visualize data with customizable widgets (e.g., donut, bar, line charts)
+  - Display current and forecasted weather information
+  - Customize display themes and screen layouts
+  - Configure settings through a built-in web GUI
+  - Customize the LED strip per screen and theme
+  - Create your own custom widgets and sensors for even more fun and flexibility
+issues: https://github.com/tjaworski/AceMagic-S1-LED-TFT-Linux/issues
+source-code: https://github.com/tjaworski/AceMagic-S1-LED-TFT-Linux/tree/main/s1panel
+
+confinement: strict
+compression: xz
+
+apps:
+  s1panel:
+    command: launch-s1panel.sh
+    daemon: simple
+    restart-condition: on-failure
+    restart-delay: 10s
+    plugs: [home, network, network-bind, raw-usb, hardware-observe, mount-observe, removable-media, block-devices]
+    environment:
+        SERVICE: 'true'
+        NODE_ENV: 'production'
+        S1PANEL_CONFIG: $HOME
+        PATH: "$SNAP/node/bin:$PATH"
+        FONTCONFIG_PATH: "$SNAP_USER_COMMON/fonts"
+        FONTCONFIG_FILE: "fonts.conf"
+        FONTCONFIG_CACHE: "$SNAP_USER_COMMON/fonts-cache"
+
+parts:
+  s1panel:
+    source: .
+    plugin: nil
+    stage-packages:
+      - libudev1
+      - libusb-1.0-0
+      - libx11-6
+      - libcairo2
+      - libpangocairo-1.0-0
+      - libjpeg-turbo8
+      - libgif7
+      - libcairo-gobject2
+      - libgdk-pixbuf-2.0-0
+      - librsvg2-2
+      - fonts-dejavu-core
+      - fonts-liberation
+      - fonts-freefont-ttf
+      - fonts-texgyre
+      - fonts-ebgaramond
+      - fontconfig
+      - fontconfig-config
+
+    override-pull: |
+      craftctl default
+
+      BRANCH=$(git rev-parse --abbrev-ref HEAD)
+      COMMIT=$(git rev-parse HEAD)
+      COMMIT_SHORT=$(git rev-parse --short HEAD)      
+      TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+
+      if echo "$TAG" | grep -q '^v'; then
+        SNAP_VERSION="$TAG"
+        GRADE=stable
+      else
+        SNAP_VERSION="$COMMIT_SHORT"
+        GRADE=devel
+      fi
+
+      echo "Setting snap grade: $GRADE"
+      craftctl set grade=$GRADE
+      echo "Setting snap version: $SNAP_VERSION"
+      craftctl set version=$SNAP_VERSION
+
+    override-build: |
+      craftctl default
+
+      echo "Installing Development Packages..."
+ 
+      sudo apt-get update
+      sudo apt-get install -y \
+        build-essential \
+        libcairo2-dev \
+        libgdk-pixbuf-2.0-0 \
+        libgif-dev \
+        libjpeg-dev \
+        libpango1.0-dev \
+        librsvg2-dev \
+        libudev-dev \
+        libusb-1.0-0-dev \
+        libx11-6 \
+        poppler-data \
+        fonts-noto-color-emoji
+
+      echo "Installing Node.js v18.20.8..."
+
+      NODE_VERSION=v18.20.8
+      NODE_DIST=node-$NODE_VERSION-linux-x64
+      NODE_URL=https://nodejs.org/dist/$NODE_VERSION/$NODE_DIST.tar.xz
+
+      mkdir -p $SNAPCRAFT_PART_INSTALL/node
+      curl -sSL $NODE_URL | tar -xJf - -C $SNAPCRAFT_PART_INSTALL/node --strip-components=1
+
+      echo "Building s1panel..."
+
+      export PATH="$SNAPCRAFT_PART_INSTALL/node/bin:$PATH"
+
+      npm ci --build-from-source
+      (cd gui; npm ci)
+      (cd gui; npm run build)
+
+      echo "Installing s1panel..."
+
+      APP_HOME="$SNAPCRAFT_PART_INSTALL/s1panel"
+
+      mkdir -p $APP_HOME/{sensors,widgets,themes,node_modules,gui/dist,in.conf}
+  
+      cp ./config.json "$APP_HOME/"
+      cp ./*.js "$APP_HOME/"
+      cp ./fonts.conf.in "$APP_HOME/in.conf/"
+      cp sensors/*.js "$APP_HOME/sensors/" || true
+      cp widgets/*.js "$APP_HOME/widgets/" || true
+      cp -r themes/* "$APP_HOME/themes/" || true
+      cp -r node_modules/* "$APP_HOME/node_modules/" || true
+      cp -r gui/dist/* "$APP_HOME/gui/dist/" || true
+
+      cat << 'EOF' > $SNAPCRAFT_PART_INSTALL/launch-s1panel.sh
+      #!/bin/sh
+
+      if [ ! -f "$HOME/config.json" ]; then
+        cp "$SNAP/s1panel/config.json" "$HOME/config.json"
+        cp -r $SNAP/s1panel/themes "$HOME/"
+      fi
+
+      mkdir -p "$SNAP_USER_COMMON/fonts"
+      mkdir -p "$SNAP_USER_COMMON/fonts-cache"
+      sed "s|@SNAP@|$SNAP|g" "$SNAP/s1panel/in.conf/fonts.conf.in" > "$SNAP_USER_COMMON/fonts/fonts.conf"
+
+      fc-cache -f -r || true
+      lsblk --fs --paths --list --exclude=7 || true
+      
+      cd "$SNAP/s1panel"
+      exec node ./main.js
+      EOF
+
+      chmod +x $SNAPCRAFT_PART_INSTALL/launch-s1panel.sh
