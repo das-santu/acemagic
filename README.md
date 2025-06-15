@@ -3,7 +3,7 @@
 <br/>
 
 <h1 align="center">
-    <a href="https://github.com/Piero24/acemagic-S1-panel-conf">ACEMAGIC S1 Mini PC Front Panel Configuration</a>
+    <a href="https://github.com/das-santu/acemagic">ACEMAGIC S1 Mini PC Front Panel Configuration</a>
 </h1>
 
 ---
@@ -61,7 +61,7 @@ Below are examples of the output on the front panel of the ACEMAGIC S1 Mini PC.
 4. Clone the Repository. Choose a directory where you’d like to clone the project, and run the following command:
 
     ```bash
-    git clone https://github.com/tjaworski/AceMagic-S1-LED-TFT-Linux.git acemagic
+    git clone https://github.com/das-santu/acemagic.git
     ```
     This will create a folder named `acemagic` with the contents of the project.
 

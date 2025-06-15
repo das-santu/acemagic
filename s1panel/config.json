@@ -52,6 +52,13 @@
          }
       },
       {
+         "module": "sensors/network.js",
+         "config": {
+            "interface": "vmbr0",
+            "max_points": 300
+         }
+      },
+      {
          "module": "sensors/memory.js",
          "config": {
             "max_points": 300

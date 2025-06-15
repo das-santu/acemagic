@@ -1,6 +1,8 @@
 #!/bin/bash
 CURRENT_DIR=$(pwd)
 
+NODE_PATH=$(which node)
+
 make_service()
 {
 cat <<EOF
@@ -8,7 +10,7 @@ cat <<EOF
 \rDescription="S1 Panel"
 \r
 \r[Service]
-\rExecStart=/usr/bin/node main.js
+\rExecStart=$NODE_PATH main.js
 \rWorkingDirectory=$CURRENT_DIR
 \rRestart=always
 \rRestartSec=10
